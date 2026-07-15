@@ -5,11 +5,11 @@ import com.example.hotelbooking.model.enums.UserRole;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
-import org.jspecify.annotations.Nullable;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.LocalDateTime;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -32,10 +32,10 @@ public class User extends BaseEntity implements UserDetails {
     @NotBlank(message = "Email is required")
     private String email;
 
-    @Column(nullable = false, length = 100, name = "password_hash")
+    @Column(nullable = false, length = 100, name = "password")
     @NotBlank(message = "Password is required")
     @Size(min = 8, max = 100, message = "Password hash must be between 8 and 100 characters")
-    private String passwordHash;
+    private String password;
 
     @Column(nullable = false, length = 50, name = "first_name")
     @NotBlank(message = "First name is required")
@@ -59,14 +59,6 @@ public class User extends BaseEntity implements UserDetails {
     @Builder.Default
     private Boolean enabled = true;
 
-    @Column(nullable = false, name = "email_verified")
-    @NotNull(message = "Email verification status is required")
-    @Builder.Default
-    private Boolean emailVerified = false;
-
-    @Column(name = "last_login_at")
-    private LocalDateTime lastLoginAt;
-
     @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @Builder.Default
     private List<Booking> bookings = new ArrayList<>();
@@ -75,10 +67,6 @@ public class User extends BaseEntity implements UserDetails {
     @Builder.Default
     private List<Review> reviews = new ArrayList<>();
 
-    @OneToMany(mappedBy = "owner", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Hotel> ownedHotels = new ArrayList<>();
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(() -> "ROLE_" + role.name());
@@ -86,7 +74,7 @@ public class User extends BaseEntity implements UserDetails {
 
     @Override
     public String getPassword() {
-        return passwordHash;
+        return password;
     }
 
     @Override

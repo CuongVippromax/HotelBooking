@@ -55,17 +55,10 @@ public class Hotel extends BaseEntity {
     @Builder.Default
     private LocalTime checkOutTime = LocalTime.of(12, 0);
 
-    @Column(columnDefinition = "TEXT", name = "cancellation_policy")
-    private String cancellationPolicy;
-
     @Column(nullable = false)
     @NotNull(message = "Enabled status is required")
     @Builder.Default
     private Boolean enabled = true;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id")
-    private User owner;
 
     @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "address_id", nullable = false)

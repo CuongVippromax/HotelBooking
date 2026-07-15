@@ -29,10 +29,6 @@ public class Room extends BaseEntity {
     @NotBlank(message = "Room number is required")
     private String roomNumber;
 
-    @Column(nullable = false)
-    @NotNull(message = "Floor is required")
-    private Integer floor;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @NotNull(message = "Room status is required")

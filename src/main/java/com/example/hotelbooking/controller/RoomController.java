@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +23,7 @@ public class RoomController {
     private final RoomService roomService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'HOTEL_MANAGER')")
     public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody RoomCreationRequest request) {
         RoomResponse response = roomService.createRoom(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -43,14 +45,28 @@ public class RoomController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HOTEL_MANAGER')")
     public ResponseEntity<RoomResponse> updateRoom(@PathVariable Long id,
                                                    @Valid @RequestBody RoomUpdateRequest request) {
         return ResponseEntity.ok(roomService.updateRoom(id, request));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HOTEL_MANAGER')")
     public ResponseEntity<Void> deleteRoom(@PathVariable Long id) {
         roomService.deleteRoom(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/amenities/{amenityId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HOTEL_MANAGER')")
+    public ResponseEntity<RoomResponse> addAmenity(@PathVariable Long id, @PathVariable Long amenityId) {
+        return ResponseEntity.ok(roomService.addAmenity(id, amenityId));
+    }
+
+    @DeleteMapping("/{id}/amenities/{amenityId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HOTEL_MANAGER')")
+    public ResponseEntity<RoomResponse> removeAmenity(@PathVariable Long id, @PathVariable Long amenityId) {
+        return ResponseEntity.ok(roomService.removeAmenity(id, amenityId));
     }
 }

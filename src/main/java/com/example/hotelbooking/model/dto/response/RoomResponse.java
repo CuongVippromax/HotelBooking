@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Setter
@@ -20,4 +21,5 @@ public class RoomResponse {
     private String hotelName;
     private Long roomTypeId;
     private String roomTypeName;
+    private List<AmenityResponse> amenities;
 }

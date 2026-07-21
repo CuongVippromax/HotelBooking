@@ -3,6 +3,7 @@ package com.example.hotelbooking.service.impl;
 import com.example.hotelbooking.model.enums.TokenType;
 import com.example.hotelbooking.service.JwtService;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -16,7 +17,6 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.time.Duration;
 import java.util.*;
-import java.util.function.Function;
 
 @Service
 @Slf4j(topic = "JWT-SERVICE")
@@ -66,18 +66,24 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String extractUsername(String token, TokenType tokenType) {
-        return extractClaim(token, tokenType, Claims::getSubject);
-    }
-
-    @Override
-    public long extractUserId(String token, TokenType tokenType) {
-        return extractClaim(token, tokenType, claims -> Long.parseLong(claims.get("userId", String.class)));
-    }
-
-    @Override
-    public String extractTokenId(String token, TokenType tokenType) {
-        return extractClaim(token, tokenType, Claims::getId);
+    @SuppressWarnings("unchecked")
+    public TokenPayload parse(String token, TokenType tokenType) {
+        // Parse + verify chữ ký 1 lần, đọc hết claim cần dùng. Tránh parse lại token nhiều lần.
+        Claims claims = parseClaims(token);
+        // Chặn dùng nhầm loại: ví dụ đưa refresh token vào endpoint cần access token.
+        String actualType = claims.get(CLAIM_TYPE, String.class);
+        if (!tokenType.name().equals(actualType)) {
+            throw new JwtException(
+                    "Token type mismatch: expected " + tokenType + " but got " + actualType);
+        }
+        // roles chỉ có ở access token; cast an toàn vì chính server ghi claim này ở generateAccessToken.
+        Object rawRoles = claims.get(CLAIM_ROLES);
+        List<String> roles = rawRoles == null ? List.of() : (List<String>) rawRoles;
+        return new TokenPayload(
+                Long.parseLong(claims.get("userId", String.class)),
+                claims.getSubject(),
+                claims.getId(),
+                roles);
     }
 
     @Override
@@ -118,19 +124,6 @@ public class JwtServiceImpl implements JwtService {
                 .expiration(new Date(now + expirationMillis))
                 .signWith(getKey(), Jwts.SIG.HS256)
                 .compact();
-    }
-
-    private <T> T extractClaim(String token, TokenType tokenType, Function<Claims, T> resolver) {
-        // parseClaims đã verify chữ ký -> tới đây token chắc chắn do server ký, chưa hết hạn.
-        Claims claims = parseClaims(token);
-        // Chặn dùng nhầm loại: ví dụ đưa refresh token vào endpoint cần access token.
-        // Nhờ check này mà KHÔNG cần 2 key riêng cho access/refresh.
-        String actualType = claims.get(CLAIM_TYPE, String.class);
-        if (!tokenType.name().equals(actualType)) {
-            throw new io.jsonwebtoken.JwtException(
-                    "Token type mismatch: expected " + tokenType + " but got " + actualType);
-        }
-        return resolver.apply(claims);
     }
 
     private Claims parseClaims(String token) {

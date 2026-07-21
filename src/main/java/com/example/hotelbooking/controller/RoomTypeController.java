@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +23,7 @@ public class RoomTypeController {
     private final RoomTypeService roomTypeService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'HOTEL_MANAGER')")
     public ResponseEntity<RoomTypeResponse> createRoomType(@Valid @RequestBody RoomTypeCreationRequest request) {
         RoomTypeResponse response = roomTypeService.createRoomType(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -38,12 +40,14 @@ public class RoomTypeController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HOTEL_MANAGER')")
     public ResponseEntity<RoomTypeResponse> updateRoomType(@PathVariable Long id,
                                                            @Valid @RequestBody RoomTypeUpdateRequest request) {
         return ResponseEntity.ok(roomTypeService.updateRoomType(id, request));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteRoomType(@PathVariable Long id) {
         roomTypeService.deleteRoomType(id);
         return ResponseEntity.noContent().build();

@@ -13,8 +13,10 @@ import com.example.hotelbooking.model.enums.UserRole;
 import com.example.hotelbooking.repository.BookingRepository;
 import com.example.hotelbooking.repository.RoomRepository;
 import com.example.hotelbooking.repository.UserRepository;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,22 +83,20 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
-    public List<BookingResponse> getMyBookings(String userEmail) {
+    public PageResponse<BookingResponse> getMyBookings(String userEmail, Pageable pageable) {
         User user = findUserOrThrow(userEmail);
-        return bookingRepository.findByCustomerId(user.getId()).stream()
-                .map(this::toResponse)
-                .toList();
+        return PageResponse.of(
+                bookingRepository.findByCustomerId(user.getId(), pageable),
+                this::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public List<BookingResponse> getAllBookings(String userEmail) {
+    public PageResponse<BookingResponse> getAllBookings(String userEmail, Pageable pageable) {
         User user = findUserOrThrow(userEmail);
         if (user.getRole() != UserRole.ADMIN && user.getRole() != UserRole.HOTEL_MANAGER) {
             throw new AccessDeniedException("Only Admins and Hotel Managers can view all bookings");
         }
-        return bookingRepository.findAll().stream()
-                .map(this::toResponse)
-                .toList();
+        return PageResponse.of(bookingRepository.findAll(pageable), this::toResponse);
     }
 
     @Transactional

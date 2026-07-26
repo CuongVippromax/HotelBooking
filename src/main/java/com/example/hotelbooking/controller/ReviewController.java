@@ -2,18 +2,19 @@ package com.example.hotelbooking.controller;
 
 import com.example.hotelbooking.model.dto.request.ReviewCreationRequest;
 import com.example.hotelbooking.model.dto.request.ReviewUpdateRequest;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import com.example.hotelbooking.model.dto.response.ReviewResponse;
 import com.example.hotelbooking.model.enums.ReviewStatus;
 import com.example.hotelbooking.service.ReviewService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -37,20 +38,22 @@ public class ReviewController {
     }
 
     @GetMapping("/hotel/{hotelId}")
-    public ResponseEntity<List<ReviewResponse>> getApprovedReviewsByHotel(@PathVariable Long hotelId) {
-        return ResponseEntity.ok(reviewService.getApprovedReviewsByHotel(hotelId));
+    public ResponseEntity<PageResponse<ReviewResponse>> getApprovedReviewsByHotel(@PathVariable Long hotelId,
+                                                                                  Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getApprovedReviewsByHotel(hotelId, pageable));
     }
 
     @GetMapping("/hotel/{hotelId}/all")
-    public ResponseEntity<List<ReviewResponse>> getAllReviewsByHotel(
+    public ResponseEntity<PageResponse<ReviewResponse>> getAllReviewsByHotel(
             @PathVariable Long hotelId,
-            Principal principal) {
-        return ResponseEntity.ok(reviewService.getAllReviewsByHotel(hotelId, principal.getName()));
+            Principal principal,
+            Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getAllReviewsByHotel(hotelId, principal.getName(), pageable));
     }
 
     @GetMapping("/my")
-    public ResponseEntity<List<ReviewResponse>> getMyReviews(Principal principal) {
-        return ResponseEntity.ok(reviewService.getReviewsByUser(principal.getName()));
+    public ResponseEntity<PageResponse<ReviewResponse>> getMyReviews(Principal principal, Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getReviewsByUser(principal.getName(), pageable));
     }
 
     @PutMapping("/{id}")

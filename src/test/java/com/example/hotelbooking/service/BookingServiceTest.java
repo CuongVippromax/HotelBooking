@@ -4,6 +4,7 @@ import com.example.hotelbooking.exception.ResourceNotFoundException;
 import com.example.hotelbooking.model.dto.request.BookingCreationRequest;
 import com.example.hotelbooking.model.dto.request.BookingUpdateRequest;
 import com.example.hotelbooking.model.dto.response.BookingResponse;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import com.example.hotelbooking.model.entity.Booking;
 import com.example.hotelbooking.model.entity.Hotel;
 import com.example.hotelbooking.model.entity.Room;
@@ -20,6 +21,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
@@ -195,7 +200,7 @@ BookingServiceTest {
         when(userRepository.findByEmail(customer.getEmail())).thenReturn(customer);
 
         assertThrows(AccessDeniedException.class, () ->
-                bookingService.getAllBookings(customer.getEmail()));
+                bookingService.getAllBookings(customer.getEmail(), PageRequest.of(0, 20)));
     }
 
     @Test
@@ -252,12 +257,15 @@ BookingServiceTest {
 
     @Test
     void getMyBookings_Success() {
+        Pageable pageable = PageRequest.of(0, 20);
         when(userRepository.findByEmail(customer.getEmail())).thenReturn(customer);
-        when(bookingRepository.findByCustomerId(1L)).thenReturn(List.of(booking));
+        when(bookingRepository.findByCustomerId(1L, pageable))
+                .thenReturn(new PageImpl<>(List.of(booking), pageable, 1));
 
-        List<BookingResponse> bookings = bookingService.getMyBookings(customer.getEmail());
+        PageResponse<BookingResponse> bookings = bookingService.getMyBookings(customer.getEmail(), pageable);
 
-        assertEquals(1, bookings.size());
-        assertEquals(100L, bookings.get(0).getId());
+        assertEquals(1, bookings.getContent().size());
+        assertEquals(100L, bookings.getContent().get(0).getId());
+        assertEquals(1, bookings.getTotalElements());
     }
 }

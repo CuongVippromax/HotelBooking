@@ -4,6 +4,7 @@ import com.example.hotelbooking.exception.DuplicateResourceException;
 import com.example.hotelbooking.exception.ResourceNotFoundException;
 import com.example.hotelbooking.model.dto.request.ReviewCreationRequest;
 import com.example.hotelbooking.model.dto.request.ReviewUpdateRequest;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import com.example.hotelbooking.model.dto.response.ReviewResponse;
 import com.example.hotelbooking.model.entity.Booking;
 import com.example.hotelbooking.model.entity.Hotel;
@@ -17,11 +18,10 @@ import com.example.hotelbooking.repository.ReviewRepository;
 import com.example.hotelbooking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -83,17 +83,17 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getApprovedReviewsByHotel(Long hotelId) {
+    public PageResponse<ReviewResponse> getApprovedReviewsByHotel(Long hotelId, Pageable pageable) {
         if (!hotelRepository.existsById(hotelId)) {
             throw new ResourceNotFoundException("Hotel not found with id: " + hotelId);
         }
-        return reviewRepository.findByHotelIdAndStatus(hotelId, ReviewStatus.APPROVED).stream()
-                .map(this::toResponse)
-                .toList();
+        return PageResponse.of(
+                reviewRepository.findByHotelIdAndStatus(hotelId, ReviewStatus.APPROVED, pageable),
+                this::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getAllReviewsByHotel(Long hotelId, String userEmail) {
+    public PageResponse<ReviewResponse> getAllReviewsByHotel(Long hotelId, String userEmail, Pageable pageable) {
         User user = userRepository.findByEmail(userEmail);
         if (user == null) {
             throw new ResourceNotFoundException("User not found with email: " + userEmail);
@@ -108,21 +108,17 @@ public class ReviewService {
             throw new ResourceNotFoundException("Hotel not found with id: " + hotelId);
         }
 
-        return reviewRepository.findByHotelId(hotelId).stream()
-                .map(this::toResponse)
-                .toList();
+        return PageResponse.of(reviewRepository.findByHotelId(hotelId, pageable), this::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getReviewsByUser(String userEmail) {
+    public PageResponse<ReviewResponse> getReviewsByUser(String userEmail, Pageable pageable) {
         User user = userRepository.findByEmail(userEmail);
         if (user == null) {
             throw new ResourceNotFoundException("User not found with email: " + userEmail);
         }
 
-        return reviewRepository.findByUserId(user.getId()).stream()
-                .map(this::toResponse)
-                .toList();
+        return PageResponse.of(reviewRepository.findByUserId(user.getId(), pageable), this::toResponse);
     }
 
     @Transactional

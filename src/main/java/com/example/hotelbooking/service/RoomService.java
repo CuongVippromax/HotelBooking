@@ -17,8 +17,10 @@ import com.example.hotelbooking.repository.HotelRepository;
 import com.example.hotelbooking.repository.RoomAmenityRepository;
 import com.example.hotelbooking.repository.RoomRepository;
 import com.example.hotelbooking.repository.RoomTypeRepository;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,20 +70,16 @@ public class RoomService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoomResponse> getAllRooms() {
-        return roomRepository.findAll().stream()
-                .map(this::toResponse)
-                .toList();
+    public PageResponse<RoomResponse> getAllRooms(Pageable pageable) {
+        return PageResponse.of(roomRepository.findAll(pageable), this::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public List<RoomResponse> getRoomsByHotel(Long hotelId) {
+    public PageResponse<RoomResponse> getRoomsByHotel(Long hotelId, Pageable pageable) {
         if (!hotelRepository.existsById(hotelId)) {
             throw new ResourceNotFoundException("Hotel not found with id: " + hotelId);
         }
-        return roomRepository.findByHotelId(hotelId).stream()
-                .map(this::toResponse)
-                .toList();
+        return PageResponse.of(roomRepository.findByHotelId(hotelId, pageable), this::toResponse);
     }
 
     @Transactional

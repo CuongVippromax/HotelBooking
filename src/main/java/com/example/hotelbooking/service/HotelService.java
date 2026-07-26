@@ -7,16 +7,17 @@ import com.example.hotelbooking.model.dto.request.HotelCreationRequest;
 import com.example.hotelbooking.model.dto.request.HotelUpdateRequest;
 import com.example.hotelbooking.model.dto.response.AddressResponse;
 import com.example.hotelbooking.model.dto.response.HotelResponse;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import com.example.hotelbooking.model.entity.Address;
 import com.example.hotelbooking.model.entity.Hotel;
 import com.example.hotelbooking.repository.HotelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -60,10 +61,8 @@ public class HotelService {
     }
 
     @Transactional(readOnly = true)
-    public List<HotelResponse> getAllHotels() {
-        return hotelRepository.findAll().stream()
-                .map(this::toResponse)
-                .toList();
+    public PageResponse<HotelResponse> getAllHotels(Pageable pageable) {
+        return PageResponse.of(hotelRepository.findAll(pageable), this::toResponse);
     }
 
     @Transactional

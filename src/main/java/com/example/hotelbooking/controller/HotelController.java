@@ -3,16 +3,16 @@ package com.example.hotelbooking.controller;
 import com.example.hotelbooking.model.dto.request.HotelCreationRequest;
 import com.example.hotelbooking.model.dto.request.HotelUpdateRequest;
 import com.example.hotelbooking.model.dto.response.HotelResponse;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import com.example.hotelbooking.service.HotelService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/hotels")
@@ -35,8 +35,8 @@ public class HotelController {
     }
 
     @GetMapping
-    public ResponseEntity<List<HotelResponse>> getAllHotels() {
-        return ResponseEntity.ok(hotelService.getAllHotels());
+    public ResponseEntity<PageResponse<HotelResponse>> getAllHotels(Pageable pageable) {
+        return ResponseEntity.ok(hotelService.getAllHotels(pageable));
     }
 
     @PutMapping("/{id}")

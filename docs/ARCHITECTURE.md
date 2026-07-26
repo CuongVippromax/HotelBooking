@@ -247,7 +247,7 @@ Client                    Server
 
 ### 3.2. Refresh token rotation + reuse detection
 
-- Mỗi refresh token có một `jti` (định danh riêng), được lưu vào Redis với key `refresh:{userId}:{jti}`, TTL = hạn refresh token.
+- Mỗi refresh token có một `jti` (định danh riêng), được lưu vào Redis với key `{userId}:{jti}`, TTL = hạn refresh token.
 - Refresh token chỉ hợp lệ khi **jti của nó còn tồn tại trong Redis**.
 - **Luồng refresh** (`POST /auth/refresh`):
   1. Parse + verify refresh token.
@@ -279,6 +279,38 @@ Client                    Server
 
 `DataInitializer` (`CommandLineRunner`) tạo tài khoản ADMIN mặc định lúc khởi động nếu chưa tồn tại. Cấu hình qua `app.admin.email` / `app.admin.password` (mặc định `admin@hotelbooking.com` / `Admin@12345`). Đây là cách có được tài khoản quản trị đầu tiên để dùng các API phân quyền.
 
+### 3.5. Chuỗi Servlet Filter (chạy trước Controller)
+
+Mỗi request đi qua các filter theo đúng thứ tự dưới đây trước khi tới controller. Tất cả đều là `OncePerRequestFilter` (chỉ chạy một lần / request).
+
+```
+Request
+  │
+  ▼
+[1] CorrelationIdFilter          (@Order HIGHEST_PRECEDENCE — sớm nhất)
+  │    ├─ Đọc header X-Correlation-Id, không có thì sinh UUID
+  │    ├─ Đưa correlationId vào MDC (mọi log sau đó tự kèm ID)
+  │    ├─ Trả header X-Correlation-Id về client
+  │    └─ Sau khi xử lý xong: log "METHOD URI -> status (Xms)" rồi clear MDC
+  ▼
+--- Security filter chain (AppConfig.filterChain) ---
+  │
+[2] JwtAuthenticationFilter      (addFilterBefore UsernamePasswordAuthenticationFilter)
+  │    ├─ Đọc Bearer token, verify + ép loại ACCESS_TOKEN
+  │    └─ Hợp lệ → set SecurityContext (username + roles)
+  ▼
+[3] RateLimitFilter              (addFilterAfter JwtAuthenticationFilter)
+  │    ├─ Chạy SAU Jwt để biết user đã xác thực (nếu có)
+  │    ├─ Định danh: "user:{email}" nếu đã đăng nhập, ngược lại "ip:{IP}"
+  │    ├─ Redis fixed-window counter (INCR + TTL); vượt ngưỡng → 429
+  │    └─ 429 trả ErrorResponse JSON + header Retry-After
+  ▼
+Controller
+```
+
+- **`CorrelationIdFilter`**: gắn ID để trace log xuyên suốt một request; đây cũng là nơi log dòng access log kèm thời gian xử lý. Chạy ngoài security chain, sớm nhất, để cả log lỗi 401/429 cũng có correlation ID. Muốn thấy ID trong log cần thêm `%X{correlationId}` vào logging pattern.
+- **`RateLimitFilter`**: giới hạn số request theo cửa sổ cố định (fixed window) trên Redis. Đặt **sau** `JwtAuthenticationFilter` để giới hạn theo user (chính xác hơn theo IP khi nhiều user chung IP). Vì là `@Component`, Spring Boot mặc định tự đăng ký nó như filter chạy **ngoài** security chain — đã tắt bằng `FilterRegistrationBean(enabled=false)` để nó chỉ chạy đúng một lần tại vị trí trong chain. Cấu hình qua `app.rate-limit.max-requests` (mặc định 100) và `app.rate-limit.window-seconds` (mặc định 60).
+
 ---
 
 ## 4. Các luồng nghiệp vụ
@@ -307,40 +339,85 @@ RoomType chia sẻ giá cơ bản; Room có pricePerNight riêng.
 - Tạo `Room` gắn với 1 Hotel + 1 RoomType; `roomNumber` unique trong cùng khách sạn.
 - Gán/gỡ tiện nghi: `POST/DELETE /api/rooms/{id}/amenities/{amenityId}`.
 
-### 4.3. Đặt phòng (Booking)
+### 4.3. Tạo phòng (Room) — ADMIN / HOTEL_MANAGER
+
+`POST /api/rooms` → `RoomService.createRoom`. Trình tự kiểm tra:
 
 ```
-POST /api/bookings  (CUSTOMER, cần đăng nhập)
+POST /api/rooms  (ADMIN / HOTEL_MANAGER)
    │
-   ├─ Kiểm tra room không ở trạng thái MAINTENANCE / OUT_OF_SERVICE
-   ├─ Kiểm tra không trùng lịch (existsOverlappingBooking)
-   ├─ Tính số đêm = checkOut - checkIn
-   ├─ totalAmount = pricePerNight × số đêm
-   ├─ Sinh bookingReference "BK-XXXXXXXX" (unique)
-   └─ status = PENDING
+   ├─ Hotel tồn tại?          (không → 404 ResourceNotFound)
+   ├─ RoomType tồn tại?       (không → 404 ResourceNotFound)
+   ├─ roomNumber unique trong hotel?  (trùng → 409 DuplicateResource, ràng buộc uk_hotel_room_number)
+   └─ status = giá trị truyền vào, mặc định AVAILABLE nếu bỏ trống
 ```
 
-**Quy tắc trùng lịch** (`existsOverlappingBooking`): một phòng bị coi là đã đặt nếu có booking ở trạng thái `PENDING`/`CONFIRMED`/`CHECKED_IN` với khoảng ngày giao nhau (`checkInDate < checkOutDate` mới và `checkOutDate > checkInDate` mới). Booking `CANCELLED`/`CHECKED_OUT`/`NO_SHOW` không chặn.
+- **Số phòng chỉ unique trong phạm vi một khách sạn** — hai khách sạn khác nhau có thể cùng có phòng "101".
+- **`Room.pricePerNight` độc lập với `RoomType.basePrice`**: booking tính tiền theo `pricePerNight` của phòng cụ thể, không dùng `basePrice` của loại phòng. `basePrice` chỉ mang tính tham khảo/giá gốc.
+- **Update** (`PUT /api/rooms/{id}`): chỉ kiểm tra lại tính unique của `roomNumber` khi nó thay đổi; các field khác patch nếu khác null.
+- **Delete** (`DELETE /api/rooms/{id}`): **hard-delete**, hiện chưa kiểm tra phòng còn booking hay không (xem [Mục 4.7 — Gaps](#47-các-điểm-logic-chưa-chặt-known-gaps)).
+- **Gán/gỡ tiện nghi**: `POST/DELETE /api/rooms/{id}/amenities/{amenityId}` qua bảng nối `RoomAmenity`, có kiểm tra tồn tại + chống trùng.
+
+### 4.4. Đặt phòng (Booking)
+
+`POST /api/bookings` → `BookingService.createBooking`. Người dùng đã đăng nhập (thường là CUSTOMER); `customer` lấy từ email trong JWT (`principal.getName()`).
+
+```
+POST /api/bookings  (cần đăng nhập)
+   │
+   ├─ 1. Room KHÔNG ở trạng thái MAINTENANCE / OUT_OF_SERVICE   (nếu có → 400)
+   ├─ 2. KHÔNG trùng lịch (existsOverlappingBooking, excludeId=null)  (trùng → 400)
+   ├─ 3. Số đêm = ChronoUnit.DAYS.between(checkIn, checkOut)
+   ├─ 4. totalAmount = room.pricePerNight × số đêm
+   ├─ 5. Sinh bookingReference "BK-XXXXXXXX" (lặp tới khi unique)
+   └─ 6. Lưu booking với status = PENDING
+```
+
+**Bước 1 — cổng trạng thái phòng**: chỉ `MAINTENANCE` và `OUT_OF_SERVICE` chặn đặt phòng. Lưu ý `OCCUPIED` **không** chặn ở bước này — phòng có "trống" hay không hoàn toàn dựa vào kiểm tra trùng lịch (bước 2), không dựa vào `Room.status`.
+
+**Bước 2 — quy tắc trùng lịch** (`existsOverlappingBooking`): một phòng bị coi là đã đặt nếu tồn tại booking thỏa **cả ba** điều kiện:
+1. cùng `room_id`,
+2. status ∈ {`PENDING`, `CONFIRMED`, `CHECKED_IN`} (các trạng thái "đang giữ phòng"),
+3. khoảng ngày giao nhau theo kiểu **nửa mở**: `existingCheckIn < newCheckOut` **và** `existingCheckOut > newCheckIn`.
+
+Hệ quả:
+- Booking `CANCELLED` / `CHECKED_OUT` / `NO_SHOW` **không** chặn → phòng tự động trống lại.
+- Cho phép **trả phòng và nhận phòng trong cùng một ngày** (khách A trả 25/7, khách B nhận 25/7 → không tính là trùng).
+
+**Bước 4 — tính giá**: dùng `Room.pricePerNight`, không dùng `RoomType.basePrice`.
 
 **Vòng đời booking**:
 ```
-PENDING ──(thanh toán COMPLETED / manager confirm)──> CONFIRMED
-   │                                                      │
-   │                                                 CHECKED_IN → CHECKED_OUT
-   └──(hủy)──> CANCELLED                                  
+PENDING ──(thanh toán COMPLETED / manager đổi status)──> CONFIRMED
+   │                                                          │
+   │                                              CHECKED_IN → CHECKED_OUT
+   └──(hủy)──> CANCELLED                          (NO_SHOW: đặt thủ công)
 ```
 
-- **Update** (`PUT /api/bookings/{id}`): chỉ khi còn `PENDING`. Đổi ngày → kiểm tra lại trùng lịch + tính lại tiền.
-- **Đổi trạng thái** (`PATCH /{id}/status`): chỉ ADMIN/HOTEL_MANAGER.
-- **Hủy** (`POST /{id}/cancel`): chủ đơn hoặc admin/manager. Không hủy được nếu đã `CHECKED_IN`/`CHECKED_OUT` hoặc đã `CANCELLED`.
+- **Update** (`PUT /api/bookings/{id}`): **chỉ sửa được khi còn `PENDING`**. Nếu đổi ngày → kiểm tra lại thứ tự (checkOut phải sau checkIn), chạy lại overlap check (loại trừ chính booking này qua `excludeBookingId`) và tính lại `totalAmount`.
+- **Hủy** (`POST /{id}/cancel`): chủ đơn hoặc ADMIN/HOTEL_MANAGER. **Không hủy được** nếu đã `CHECKED_IN` / `CHECKED_OUT`, hoặc đã `CANCELLED` (chống hủy hai lần).
 
-### 4.4. Thanh toán (Payment)
+### 4.5. Nhận phòng & trả phòng (Check-in / Check-out)
+
+**Không có endpoint riêng.** Nhận/trả phòng thực hiện qua API đổi trạng thái chung:
+
+```
+PATCH /api/bookings/{id}/status?status=CHECKED_IN    → nhận phòng
+PATCH /api/bookings/{id}/status?status=CHECKED_OUT   → trả phòng
+```
+
+`BookingService.updateBookingStatus`:
+- **Chỉ ADMIN / HOTEL_MANAGER** được gọi (lễ tân/quản lý thao tác, không phải khách).
+- **Không có state-machine validation**: người có quyền chuyển booking sang **bất kỳ** trạng thái nào, kể cả nhảy thẳng sang `CHECKED_OUT` mà chưa `CHECKED_IN`. Đây là cơ chế check-in/check-out de-facto (xem [Mục 4.7 — Gaps](#47-các-điểm-logic-chưa-chặt-known-gaps)).
+- **`Room.status` không tự đồng bộ** khi check-in/check-out — phòng không tự chuyển sang `OCCUPIED` khi có khách nhận. Việc quản lý phòng trống chỉ dựa vào overlap query trên booking.
+
+### 4.6. Thanh toán (Payment)
 
 ```
 POST /api/payments  (chủ booking hoặc admin/manager)
    │
-   ├─ Booking không được CANCELLED
-   ├─ Mỗi booking chỉ 1 payment (1-1)
+   ├─ Booking không được CANCELLED         (nếu là → 400)
+   ├─ Mỗi booking chỉ 1 payment (1-1)      (đã có → 409 DuplicateResource)
    ├─ Sinh transactionId "TXN-..." (unique)
    ├─ amount = booking.totalAmount
    └─ status = PENDING
@@ -352,7 +429,18 @@ PATCH /api/payments/{id}/status  (ADMIN / HOTEL_MANAGER)
         └─ nếu booking đang PENDING → tự động chuyển CONFIRMED
 ```
 
-### 4.5. Đánh giá (Review)
+**Cầu nối giữa hai domain**: thanh toán chuyển sang `COMPLETED` là tác nhân duy nhất tự động xác nhận booking (`PENDING → CONFIRMED`). Các trạng thái payment khác (`PROCESSING`, `FAILED`, `REFUNDED`...) không có side-effect lên booking.
+
+### 4.7. Các điểm logic chưa chặt (Known gaps)
+
+Những chỗ dưới đây hiện chưa được enforce trong code — ghi lại để tránh hiểu nhầm là đã có, và làm danh sách việc cần cân nhắc:
+
+1. **Không kiểm tra số khách vs sức chứa**: `numberOfGuests` không được validate với `RoomType.maxOccupancy` khi đặt phòng.
+2. **`updateBookingStatus` không có state machine**: có thể chuyển trạng thái tùy ý (VD: sang `CHECKED_OUT` mà chưa qua `CHECKED_IN`). Chỉ `cancelBooking` mới có guard chuyển trạng thái.
+3. **`Room.status` không đồng bộ với vòng đời booking**: check-in không làm phòng thành `OCCUPIED`; `OCCUPIED` được định nghĩa nhưng không dùng trong logic đặt phòng.
+4. **`deleteRoom` hard-delete không kiểm tra ràng buộc**: xóa phòng không kiểm tra booking đang tồn tại → có thể lỗi khóa ngoại hoặc để lại booking mồ côi tùy ràng buộc DB.
+
+### 4.8. Đánh giá (Review)
 
 ```
 POST /api/reviews  (cần đăng nhập)
@@ -370,6 +458,40 @@ Duyệt: PATCH /api/reviews/{id}/status  (ADMIN / HOTEL_MANAGER)
 - **Đọc toàn bộ** (gồm PENDING/FLAGGED): `GET /api/reviews/hotel/{hotelId}/all` — chỉ ADMIN/HOTEL_MANAGER.
 - **Sửa/xóa**: chỉ tác giả hoặc ADMIN. Khi sửa, status reset về `PENDING` (duyệt lại).
 
+### 4.9. Phân trang (Pagination)
+
+Các endpoint trả về danh sách có thể phình to đều nhận `Pageable` (Spring tự bind từ query param) và trả `PageResponse<T>` thay vì `List<T>` trần.
+
+**Endpoint đã phân trang**:
+- Booking: `GET /api/bookings`, `GET /api/bookings/my`
+- Room: `GET /api/rooms`, `GET /api/rooms/hotel/{hotelId}`
+- Hotel: `GET /api/hotels`
+- Review: `GET /api/reviews/hotel/{hotelId}`, `GET /api/reviews/hotel/{hotelId}/all`, `GET /api/reviews/my`
+
+Các endpoint tra cứu nhỏ (RoomType, Amenity) và endpoint chi tiết (`GET /{id}`) giữ nguyên, không phân trang.
+
+**Query param** (chuẩn Spring Data):
+```
+GET /api/rooms?page=0&size=20&sort=pricePerNight,asc
+```
+- `page`: số trang, bắt đầu từ 0 (mặc định 0).
+- `size`: số phần tử mỗi trang (mặc định 20).
+- `sort`: `field,asc|desc` (lặp lại nhiều lần để sort đa tiêu chí).
+
+**Cấu trúc `PageResponse<T>`** (không trả `PageImpl` trực tiếp vì Spring cảnh báo định dạng serialize không ổn định giữa các phiên bản):
+```json
+{
+  "content": [ ... ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 135,
+  "totalPages": 7,
+  "first": true,
+  "last": false
+}
+```
+`PageResponse.of(Page<E>, Function<E,T>)` map từng entity sang DTO đồng thời giữ nguyên metadata phân trang.
+
 ---
 
 ## 5. Xử lý lỗi tập trung
@@ -386,6 +508,8 @@ Duyệt: PATCH /api/reviews/{id}/status  (ADMIN / HOTEL_MANAGER)
 | `JwtException` | 401 Unauthorized |
 | `MethodArgumentNotValidException` | 400 + map lỗi từng field |
 | `Exception` (còn lại) | 500 Internal Server Error |
+
+> **Ngoài `GlobalExceptionHandler`**: `RateLimitFilter` chạy trong filter chain (trước khi tới controller/`@RestControllerAdvice`) nên tự ghi `ErrorResponse` cùng định dạng với **429 Too Many Requests**, kèm header `Retry-After`.
 
 ---
 
@@ -421,8 +545,9 @@ Duyệt: PATCH /api/reviews/{id}/status  (ADMIN / HOTEL_MANAGER)
 ## 7. Cấu hình & vận hành
 
 - **Database**: PostgreSQL (`jdbc:postgresql://localhost:5432/HotelBooking`), `ddl-auto: update`. Test dùng H2 in-memory (`create-drop`, profile `test`).
-- **Redis**: `localhost:6379` — lưu jti refresh token.
+- **Redis**: `localhost:6379` — lưu jti refresh token và bộ đếm rate limit (`rate-limit:*`).
 - **JWT**: `jwt.secretKey`, access token 10 phút (`600000` ms), refresh token 7 ngày (`604800000` ms).
+- **Rate limit**: `app.rate-limit.max-requests` (mặc định `100`) request trên mỗi `app.rate-limit.window-seconds` (mặc định `60`) giây, tính theo user đã đăng nhập hoặc IP. Xem [Mục 3.5](#35-chuỗi-servlet-filter).
 - **Swagger UI**: `http://localhost:8080/swagger-ui.html` (đã cấu hình JWT bearer scheme).
 
 > **Lưu ý bảo mật khi deploy**: `jwt.secretKey` và `app.admin.password` đang để giá trị mặc định trong `application.yaml`. Trước khi lên production nên chuyển sang biến môi trường và đổi giá trị.

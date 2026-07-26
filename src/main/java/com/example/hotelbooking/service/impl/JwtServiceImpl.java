@@ -37,7 +37,7 @@ public class JwtServiceImpl implements JwtService {
 
     private final RedisTemplate<String, String> redisTemplate;
 
-    @Override
+     @Override
     public String generateAccessToken(long userId, String userName, Collection<? extends GrantedAuthority> roles) {
         log.info("Generating access token for userId={} userName={}", userId, userName);
         Map<String, Object> claims = new HashMap<>();
@@ -56,7 +56,7 @@ public class JwtServiceImpl implements JwtService {
         // Đánh dấu loại token để sau này chặn việc dùng refresh token thay cho access token.
         claims.put(CLAIM_TYPE, TokenType.REFRESH_TOKEN.name());
         String token = buildToken(claims, userId, userName, refreshTokenExpiration, tokenId);
-        // Lưu state vào Redis: key = refresh:{userId}:{jti}, TTL = hạn của refresh token.
+        // Lưu state vào Redis: key = {userId}:{jti}, TTL = hạn của refresh token.
         // Redis tự xóa key khi hết hạn -> không cần dọn rác thủ công.
         redisTemplate.opsForValue().set(
                 refreshKey(userId, tokenId),
@@ -118,7 +118,7 @@ public class JwtServiceImpl implements JwtService {
         claims.put("userId", String.valueOf(userId));
         return Jwts.builder()
                 .claims(claims)
-                .id(tokenId)                 // jti: định danh token, đọc lại qua Claims::getId
+                .id(tokenId)
                 .subject(userName)
                 .issuedAt(new Date(now))
                 .expiration(new Date(now + expirationMillis))
@@ -142,6 +142,6 @@ public class JwtServiceImpl implements JwtService {
     }
 
     private String refreshKey(long userId, String tokenId) {
-        return "refresh:" + userId + ":" + tokenId;
+        return userId + ":" + tokenId;
     }
 }

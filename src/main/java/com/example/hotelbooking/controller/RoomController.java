@@ -2,17 +2,17 @@ package com.example.hotelbooking.controller;
 
 import com.example.hotelbooking.model.dto.request.RoomCreationRequest;
 import com.example.hotelbooking.model.dto.request.RoomUpdateRequest;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import com.example.hotelbooking.model.dto.response.RoomResponse;
 import com.example.hotelbooking.service.RoomService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/rooms")
@@ -35,13 +35,14 @@ public class RoomController {
     }
 
     @GetMapping
-    public ResponseEntity<List<RoomResponse>> getAllRooms() {
-        return ResponseEntity.ok(roomService.getAllRooms());
+    public ResponseEntity<PageResponse<RoomResponse>> getAllRooms(Pageable pageable) {
+        return ResponseEntity.ok(roomService.getAllRooms(pageable));
     }
 
     @GetMapping("/hotel/{hotelId}")
-    public ResponseEntity<List<RoomResponse>> getRoomsByHotel(@PathVariable Long hotelId) {
-        return ResponseEntity.ok(roomService.getRoomsByHotel(hotelId));
+    public ResponseEntity<PageResponse<RoomResponse>> getRoomsByHotel(@PathVariable Long hotelId,
+                                                                      Pageable pageable) {
+        return ResponseEntity.ok(roomService.getRoomsByHotel(hotelId, pageable));
     }
 
     @PutMapping("/{id}")

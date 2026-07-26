@@ -2,16 +2,15 @@ package com.example.hotelbooking.repository;
 
 import com.example.hotelbooking.model.entity.Review;
 import com.example.hotelbooking.model.enums.ReviewStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
-
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
-    List<Review> findByHotelId(Long hotelId);
-    List<Review> findByHotelIdAndStatus(Long hotelId, ReviewStatus status);
-    List<Review> findByUserId(Long userId);
+    Page<Review> findByHotelId(Long hotelId, Pageable pageable);
+    Page<Review> findByHotelIdAndStatus(Long hotelId, ReviewStatus status, Pageable pageable);
+    Page<Review> findByUserId(Long userId, Pageable pageable);
     boolean existsByBookingId(Long bookingId);
 }

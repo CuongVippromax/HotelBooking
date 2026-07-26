@@ -3,17 +3,18 @@ package com.example.hotelbooking.controller;
 import com.example.hotelbooking.model.dto.request.BookingCreationRequest;
 import com.example.hotelbooking.model.dto.request.BookingUpdateRequest;
 import com.example.hotelbooking.model.dto.response.BookingResponse;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import com.example.hotelbooking.model.enums.BookingStatus;
 import com.example.hotelbooking.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/bookings")
@@ -37,13 +38,13 @@ public class BookingController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<List<BookingResponse>> getMyBookings(Principal principal) {
-        return ResponseEntity.ok(bookingService.getMyBookings(principal.getName()));
+    public ResponseEntity<PageResponse<BookingResponse>> getMyBookings(Principal principal, Pageable pageable) {
+        return ResponseEntity.ok(bookingService.getMyBookings(principal.getName(), pageable));
     }
 
     @GetMapping
-    public ResponseEntity<List<BookingResponse>> getAllBookings(Principal principal) {
-        return ResponseEntity.ok(bookingService.getAllBookings(principal.getName()));
+    public ResponseEntity<PageResponse<BookingResponse>> getAllBookings(Principal principal, Pageable pageable) {
+        return ResponseEntity.ok(bookingService.getAllBookings(principal.getName(), pageable));
     }
 
     @PutMapping("/{id}")

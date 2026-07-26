@@ -2,6 +2,7 @@ package com.example.hotelbooking.config;
 
 import com.example.hotelbooking.service.impl.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -37,16 +38,12 @@ public class AppConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Auth flow (login/refresh/logout)
                         .requestMatchers("/auth/**").permitAll()
-                        // Đăng ký tài khoản
                         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
-                        // Swagger / OpenAPI docs
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**").permitAll()
-                        // Duyệt công khai: xem khách sạn, phòng, loại phòng, review đã duyệt
                         .requestMatchers(HttpMethod.GET,
                                 "/api/hotels/**",
                                 "/api/rooms/**",
@@ -55,7 +52,8 @@ public class AppConfig {
                                 "/api/reviews/hotel/*").permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider()).addFilterBefore(jwtAuthenticationFilter,UsernamePasswordAuthenticationFilter.class);
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
@@ -87,5 +85,6 @@ public class AppConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config)throws Exception {
         return config.getAuthenticationManager();
     }
+
 
 }

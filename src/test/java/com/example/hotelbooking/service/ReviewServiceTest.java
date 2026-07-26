@@ -4,6 +4,7 @@ import com.example.hotelbooking.exception.DuplicateResourceException;
 import com.example.hotelbooking.exception.ResourceNotFoundException;
 import com.example.hotelbooking.model.dto.request.ReviewCreationRequest;
 import com.example.hotelbooking.model.dto.request.ReviewUpdateRequest;
+import com.example.hotelbooking.model.dto.response.PageResponse;
 import com.example.hotelbooking.model.dto.response.ReviewResponse;
 import com.example.hotelbooking.model.entity.Booking;
 import com.example.hotelbooking.model.entity.Hotel;
@@ -21,6 +22,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
@@ -119,14 +123,17 @@ class ReviewServiceTest {
 
     @Test
     void getApprovedReviewsByHotel_Success() {
+        Pageable pageable = PageRequest.of(0, 20);
         when(hotelRepository.existsById(10L)).thenReturn(true);
-        when(reviewRepository.findByHotelIdAndStatus(10L, ReviewStatus.APPROVED)).thenReturn(List.of(review));
+        when(reviewRepository.findByHotelIdAndStatus(10L, ReviewStatus.APPROVED, pageable))
+                .thenReturn(new PageImpl<>(List.of(review), pageable, 1));
 
-        List<ReviewResponse> reviews = reviewService.getApprovedReviewsByHotel(10L);
+        PageResponse<ReviewResponse> reviews = reviewService.getApprovedReviewsByHotel(10L, pageable);
 
-        assertFalse(reviews.isEmpty());
-        assertEquals(1, reviews.size());
-        assertEquals(100L, reviews.get(0).getId());
+        assertFalse(reviews.getContent().isEmpty());
+        assertEquals(1, reviews.getContent().size());
+        assertEquals(100L, reviews.getContent().get(0).getId());
+        assertEquals(1, reviews.getTotalElements());
     }
 
     @Test

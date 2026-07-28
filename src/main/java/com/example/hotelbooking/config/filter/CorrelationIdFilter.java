@@ -1,4 +1,4 @@
-package com.example.hotelbooking.config;
+package com.example.hotelbooking.config.filter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

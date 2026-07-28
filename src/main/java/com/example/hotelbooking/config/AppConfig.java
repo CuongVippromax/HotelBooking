@@ -1,8 +1,8 @@
 package com.example.hotelbooking.config;
 
+import com.example.hotelbooking.config.filter.JwtAuthenticationFilter;
 import com.example.hotelbooking.service.impl.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;

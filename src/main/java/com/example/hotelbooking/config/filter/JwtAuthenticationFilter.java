@@ -1,4 +1,4 @@
-package com.example.hotelbooking.config;
+package com.example.hotelbooking.config.filter;
 
 import com.example.hotelbooking.model.enums.TokenType;
 import com.example.hotelbooking.service.JwtService;

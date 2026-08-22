@@ -27,18 +27,9 @@ spring:
           batch_size: 20
         order_inserts: true
         order_updates: true
-    show-sql: true
-  sql:
-    init:
-      mode: always
+    show-sql: false
 
-app:
-  admin:
-    email: ${ADMIN_EMAIL:admin@hotelbooking.com}
-    password: ${ADMIN_PASSWORD:Admin@12345}
-  rate-limit:
-    max-requests: ${RATE_LIMIT_MAX_REQUESTS:100}
-    window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+
 
 jwt:
   secretKey: c2hvcGJhbmhhbmcxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY=

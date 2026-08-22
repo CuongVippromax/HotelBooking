@@ -62,6 +62,33 @@ public class UserService {
         log.info("Deleted user id={}", id);
     }
 
+    @Transactional
+    public UserResponse updateUser(Long id, UserUpdateRequest request) {
+        User user = findUserOrThrow(id);
+
+        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new DuplicateResourceException(
+                        "User with email '" + request.getEmail() + "' already exists");
+            }
+            user.setEmail(request.getEmail());
+        }
+
+        if (request.getFirstName() != null) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            user.setLastName(request.getLastName());
+        }
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber());
+        }
+
+        User saved = userRepository.save(user);
+        log.info("Updated user id={}", saved.getId());
+        return toResponse(saved);
+    }
+
     private User findUserOrThrow(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));

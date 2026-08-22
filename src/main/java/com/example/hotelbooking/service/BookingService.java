@@ -173,6 +173,18 @@ public class BookingService {
         return toResponse(saved);
     }
 
+    @Transactional
+    public void deleteBooking(Long id) {
+        Booking booking = findBookingOrThrow(id);
+        // Prevent deletion of bookings that are checked in or checked out
+        if (booking.getStatus() == BookingStatus.CHECKED_IN
+                || booking.getStatus() == BookingStatus.CHECKED_OUT) {
+            throw new IllegalArgumentException("Cannot delete a booking that is already checked in or checked out");
+        }
+        bookingRepository.delete(booking);
+        log.info("Deleted booking id={}", id);
+    }
+
     private void ensureCanAccess(Booking booking, User user) {
         boolean isOwner = booking.getCustomer().getId().equals(user.getId());
         boolean isPrivileged = user.getRole() == UserRole.ADMIN || user.getRole() == UserRole.HOTEL_MANAGER;

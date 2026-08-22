@@ -116,6 +116,17 @@ public class PaymentService {
         return toResponse(saved);
     }
 
+    @Transactional
+    public void deletePayment(Long id) {
+        Payment payment = findPaymentOrThrow(id);
+        // Only allow deletion of pending payments (not completed or cancelled)
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            throw new IllegalArgumentException("Only pending payments can be deleted");
+        }
+        paymentRepository.delete(payment);
+        log.info("Deleted payment id={}", id);
+    }
+
     private void ensureCanAccess(Booking booking, User user) {
         boolean isOwner = booking.getCustomer().getId().equals(user.getId());
         boolean isPrivileged = user.getRole() == UserRole.ADMIN || user.getRole() == UserRole.HOTEL_MANAGER;

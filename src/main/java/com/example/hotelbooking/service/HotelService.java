@@ -13,6 +13,7 @@ import com.example.hotelbooking.model.entity.Hotel;
 import com.example.hotelbooking.repository.HotelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,11 +57,13 @@ public class HotelService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "hotels", key = "#id")
     public HotelResponse getHotel(Long id) {
         return toResponse(findHotelOrThrow(id));
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "hotelsAll", key = "#pageable.pageNumber + '_' + #pageable.pageSize")
     public PageResponse<HotelResponse> getAllHotels(Pageable pageable) {
         return PageResponse.of(hotelRepository.findAll(pageable), this::toResponse);
     }

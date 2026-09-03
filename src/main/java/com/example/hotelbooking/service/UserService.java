@@ -63,8 +63,14 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse updateUser(Long id, UserUpdateRequest request) {
+    public UserResponse updateUser(Long id, UserUpdateRequest request, String userEmail) {
         User user = findUserOrThrow(id);
+        User currentUser = findUserOrThrow(userEmail);
+
+        // Only ADMIN or the user themselves can update
+        if (!currentUser.getId().equals(user.getId()) && currentUser.getRole() != UserRole.ADMIN) {
+            throw new AccessDeniedException("You are not authorized to update this user");
+        }
 
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
             if (userRepository.existsByEmail(request.getEmail())) {

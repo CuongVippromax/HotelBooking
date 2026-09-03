@@ -83,6 +83,7 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "myBookings", key = "#userEmail + '_' + #pageable.pageNumber + '_' + #pageable.pageSize")
     public PageResponse<BookingResponse> getMyBookings(String userEmail, Pageable pageable) {
         User user = findUserOrThrow(userEmail);
         return PageResponse.of(
@@ -174,8 +175,10 @@ public class BookingService {
     }
 
     @Transactional
-    public void deleteBooking(Long id) {
+    public void deleteBooking(Long id, String userEmail) {
         Booking booking = findBookingOrThrow(id);
+        User user = findUserOrThrow(userEmail);
+        ensureCanAccess(booking, user);
         // Prevent deletion of bookings that are checked in or checked out
         if (booking.getStatus() == BookingStatus.CHECKED_IN
                 || booking.getStatus() == BookingStatus.CHECKED_OUT) {

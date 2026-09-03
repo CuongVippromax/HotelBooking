@@ -12,6 +12,7 @@ import lombok.*;
 public class PaymentCreationRequest {
 
     @NotNull(message = "Booking id is required")
+    @Min(value = 1, message = "Booking id must be greater than zero")
     private Long bookingId;
 
     @NotNull(message = "Payment method is required")

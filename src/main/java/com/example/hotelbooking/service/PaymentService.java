@@ -117,8 +117,10 @@ public class PaymentService {
     }
 
     @Transactional
-    public void deletePayment(Long id) {
+    public void deletePayment(Long id, String userEmail) {
         Payment payment = findPaymentOrThrow(id);
+        User user = findUserOrThrow(userEmail);
+        ensureCanAccess(payment.getBooking(), user);
         // Only allow deletion of pending payments (not completed or cancelled)
         if (payment.getStatus() != PaymentStatus.PENDING) {
             throw new IllegalArgumentException("Only pending payments can be deleted");

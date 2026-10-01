@@ -97,7 +97,7 @@ Các nhóm API chính:
 
 ### Validation
 - Sử dụng Jakarta Validation để validate đầu vào API
-- Custom validation constraints cho các trường đặc殊
+- Custom validation constraints cho các trường đặc biệt
 
 ### Xử lý lỗi
 - Centralized exception handling

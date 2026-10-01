@@ -1,6 +1,7 @@
 package com.example.hotelbooking.model.dto.request;
 
 import com.example.hotelbooking.model.enums.PaymentMethod;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 

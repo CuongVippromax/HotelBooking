@@ -3,12 +3,14 @@ package com.example.hotelbooking.service;
 import com.example.hotelbooking.exception.DuplicateResourceException;
 import com.example.hotelbooking.exception.ResourceNotFoundException;
 import com.example.hotelbooking.model.dto.request.UserCreationRequest;
+import com.example.hotelbooking.model.dto.request.UserUpdateRequest;
 import com.example.hotelbooking.model.dto.response.UserResponse;
 import com.example.hotelbooking.model.entity.User;
 import com.example.hotelbooking.model.enums.UserRole;
 import com.example.hotelbooking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,7 +67,7 @@ public class UserService {
     @Transactional
     public UserResponse updateUser(Long id, UserUpdateRequest request, String userEmail) {
         User user = findUserOrThrow(id);
-        User currentUser = findUserOrThrow(userEmail);
+        User currentUser = findUserOrThrow(id);
 
         // Only ADMIN or the user themselves can update
         if (!currentUser.getId().equals(user.getId()) && currentUser.getRole() != UserRole.ADMIN) {
